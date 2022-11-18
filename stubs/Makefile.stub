@@ -1,0 +1,26 @@
+sail=./vendor/bin/sail
+up:
+	$(sail) up -d
+down:
+	$(sail) down
+restart:
+	@make down
+	@make up
+vite-dev:
+	$(sail) npm run dev
+vite-build:
+	$(sail) npm run build
+reset-db:
+	$(sail) art migrate:refresh --seed
+restart-vite-dev:
+	@make restart
+	@make vite-dev
+restart-vite-build:
+	@make restart
+	@make vite-build
+run-vite-dev:
+	@make up
+	@make vite-dev
+run-vite-build:
+	@make up
+	@make vite-build

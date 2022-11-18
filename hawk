@@ -4,7 +4,7 @@ DOCKER_COMPOSE_STUB=$STUBS_DIR/docker-compose.yml.stub
 CURRENT_COMPOSE="$(pwd)/docker-compose.yml"
 
 if [ ! -f $DOCKER_COMPOSE_STUB ]; then
-    echo "\033[1m找不到 docker-compose.yml.stub \033[0m"
+    echo "找不到 docker-compose.yml.stub"
     exit 1
 else
     cp $DOCKER_COMPOSE_STUB $CURRENT_COMPOSE
@@ -39,4 +39,28 @@ echo "networks:
         driver: bridge" >> $CURRENT_COMPOSE
 
 echo ""
-echo "\033[1m已產生 docker-compose.yml"
+echo "已產生 docker-compose.yml"
+
+echo ""
+echo "install sail..."
+echo ""
+
+docker info > /dev/null 2>&1
+
+# Ensure that Docker is running...
+if [ $? -ne 0 ]; then
+    echo "Docker is not running."
+
+    exit 1
+fi
+
+docker run --rm \
+    --pull=always \
+    -v "$(pwd)":/opt \
+    -w /opt \
+    laravelsail/php81-composer:latest \
+    bash -c "composer require laravel/sail --dev"
+
+./vendor/bin/sail build
+
+echo "Thank you!"
