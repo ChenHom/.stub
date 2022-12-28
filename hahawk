@@ -1,0 +1,311 @@
+#!/usr/bin/env bash -e
+# 參考至 https://github.com/laravel/sail/blob/1.x/bin/sail
+
+if test -t 1; then
+    ncolors=$(tput colors)
+
+    if test -n "$ncolors" && test "$ncolors" -ge 8; then
+        BOLD="$(tput bold)"
+        YELLOW="$(tput setaf 3)"
+        GREEN="$(tput setaf 2)"
+        NC="$(tput sgr0)"
+    fi
+fi
+
+function display_help {
+    echo "hahawk"
+    echo
+    echo "${YELLOW}Usage:${NC}" >&2
+    echo " hahawk COMMAND [options] [arguments]"
+    echo
+    echo "未知的指令會傳遞至 docker-compose binary."
+    echo
+    echo "${YELLOW}docker-compose Commands:${NC}"
+    echo "  ${GREEN}hahawk up${NC}                          啟動應用程式"
+    echo "  ${GREEN}hahawk up -d${NC}                       啟動應用程式"
+    echo "  ${GREEN}hahawk stop${NC}                        停止應用程式"
+    echo "  ${GREEN}hahawk restart${NC}                     重啟應用程式"
+    echo "  ${GREEN}hahawk ps${NC}                          顯示所有容器狀態"
+    echo
+    echo "${YELLOW}Create Laraval Application:${NC}"
+    echo "  ${GREEN}hahawk create app_name [-s service1,service2...]${NC}     建立 Laravel 的應用程式"
+    # echo "  ${GREEN}hahawk create nest app_name${NC}        建立 Nest 的應用程式"
+    echo
+    echo "${YELLOW}PHP Commands:${NC}"
+    echo "  ${GREEN}hahawk php ...${NC}                     執行 PHP 的程式碼"
+    echo "  ${GREEN}hahawk php -v${NC}"
+    echo
+    echo "${YELLOW}Composer Commands:${NC}"
+    echo "  ${GREEN}hahawk composer ...${NC}                執行 Composer 指令"
+    echo
+    echo "${YELLOW}Node Commands:${NC}"
+    echo "  ${GREEN}hahawk node ...${NC}                    執行 Node 指令"
+    echo "  ${GREEN}hahawk node --version${NC}"
+    echo
+    echo "${YELLOW}NPM Commands:${NC}"
+    echo "  ${GREEN}hahawk npm ...${NC}                     執行 NPM 指令"
+    echo "  ${GREEN}hahawk npx${NC}                         執行 NPX 指令"
+    echo "  ${GREEN}hahawk npm run prod${NC}"
+    echo
+    echo "${YELLOW}Yarn Commands:${NC}"
+    echo "  ${GREEN}hahawk yarn ...${NC}                    執行 Yarn 指令"
+    echo "  ${GREEN}hahawk yarn run prod${NC}"
+    echo
+    echo "${YELLOW}Database Commands:${NC}"
+    echo "  ${GREEN}hahawk mysql${NC}                       在 mysql 容器中啟動 mysql 的 cli"
+    echo "  ${GREEN}hahawk mariadb${NC}                     在 mariadb 容器中啟動 mariadb 的 cli"
+    echo "  ${GREEN}hahawk redis${NC}                       在 redis 容器中啟動 redis 的 cli"
+    echo
+    echo "${YELLOW}Container CLI:${NC}"
+    echo "  ${GREEN}hahawk shell${NC}                       在應用程式容器中啟動 cli"
+    echo "  ${GREEN}hahawk bash${NC}                        'hahawk shell'的別名"
+    echo "  ${GREEN}hahawk root-shell${NC}                  在應用程式容器中啟動 root 的 cli"
+    echo "  ${GREEN}hahawk root-bash${NC}                   'hahawk root-shell'的別名"
+    echo
+    echo "${YELLOW}Binaries:${NC}"
+    echo "  ${GREEN}hahawk bin ...${NC}                     執行在 vendor/bin 中的 Composer 腳本"
+    echo
+    echo "${YELLOW}Customization:${NC}"
+    echo "  ${GREEN}hahawk build --no-cache${NC}            重建所有容器"
+    exit 0
+}
+
+function is_not_running {
+    echo "${BOLD}hahawk 未執行.${NC}" >&2
+    echo
+    echo "${BOLD}You may using..."
+    exit 1
+}
+
+if [ $# -gt 0 ]; then
+    if [ "$1" == "help" ] || [ "$1" == "-h" ] || [ "$1" == "-help" ] || [ "$1" == "--help" ]; then
+        display_help
+    fi
+else
+    display_help
+fi
+
+
+if [ -f ./.env ]; then
+    source ./.env;
+fi
+
+export APP_PORT=${APP_PORT:-80}
+export APP_SERVICE=${APP_SERVICE:-"hom.test"}
+export DB_PORT="${DB_PORT:-3006}"
+export WWWUSER="${WWWUSER:-$UID}"
+export WWWGROUP="${WWWGROUP:-$(id -g)}"
+
+# 將輸入放進 null 裡
+docker compose &> /dev/null
+if [ $? == 0 ]; then
+    DOCKER_COMPOSE=(docker compose)
+else
+    DOCKER_COMPOSE=(docker-compose)
+fi
+
+
+EXEC="yes"
+
+if [ -z "$SAIL_SKIP_CHECKS" ]; then
+    if ! docker info > /dev/null 2>&1; then
+        echo "${BOLD}Docker 沒有啟動.${NC}" >&2
+        exit 1
+    fi
+    if [ -f ./docker-compose.yml ]; then 
+        if "${DOCKER_COMPOSE[@]}" ps "$APP_SERVICE" 2>&1 | grep 'Exit\|exited'; then
+            echo "${BOLD}中斷舊的 Hahawk 處理程序...${NC}" >&2
+
+            "${DOCKER_COMPOSE[@]}" down > /dev/null 2>&1
+
+            EXEC="no"
+        elif [ -z "$("${DOCKER_COMPOSE[@]}" ps -q)" ]; then
+            EXEC="no"
+        fi
+    fi
+fi
+
+ARGS=()
+
+if [ "$1" == "create" ]; then
+    shift 1
+
+    DIR_NAME=$1
+    CURL_URL="https://laravel.build/${DIR_NAME}"
+
+    shift 1
+
+    while getopts "s:" s; do
+        SERVICES="${OPTARG}"
+    done
+
+    if [ ! -z "$SERVICES" ]; then
+        curl -s "${CURL_URL}?with=${SERVICES%,}" | bash
+    else
+        curl -s "${CURL_URL}" | bash
+    fi
+
+    cd $DIR_NAME
+
+    if [ -f ~/.stub/stubs/Makefile.stub ]; then
+        cp ~/.stub/stubs/Makefile.stub ./Makefile
+
+        echo "已建立 ${GREEN}Makefile${NC}"
+    else
+        echo "查無可複製的 ${YELLOW}Makefile${NC}"
+    fi
+
+    exit 0
+
+elif [ "$1" == "php" ]; then
+    shift 1
+
+    if [ "$EXEC" == "yes" ]; then
+        ARGS+=(exec -u "$WWWUSER")
+        [ ! -t 0 ] && ARGS+=(-T)
+        ARGS+=("$APP_SERVICE" "php" "$@")
+    elif [ "$EXEC" == "no" ]; then
+        is_not_running
+    fi
+
+elif [ "$1" == "bin" ]; then
+    shift 1
+
+    if [ "$EXEC" == "yes" ]; then
+        ARGS+=(exec -u "$WWWUSER")
+        [ ! -t 0 ] && ARGS+=(-T)
+        ARGS+=("$APP_SERVICE" ./vendor/bin/"$@")
+    elif [ "$EXEC" == "no" ]; then
+        is_not_running
+    fi
+
+elif [ "$1" == "docker-compose" ]; then
+    shift 1
+
+    if [ "$EXEC" == "yes" ]; then
+        ARGS+=(exec -u "$WWWUSER")
+        [ ! -t 0 ] && ARGS+=(-T)
+        ARGS+=("$APP_SERVICE" "${DOCKER_COMPOSE[@]}")
+    elif [ "$EXEC" == "no" ]; then
+        is_not_running
+    fi
+
+elif [ "$1" == "composer" ]; then
+    shift 1
+
+    if [ "$EXEC" == "yes" ]; then
+        ARGS+=(exec -u "$WWWUSER")
+        [ ! -t 0 ] && ARGS+=(-T)
+        ARGS+=("$APP_SERVICE" "composer" "$@") 
+    elif [ "$EXEC" == "no" ]; then
+        is_not_running
+    fi
+
+elif [ "$1" == "node" ]; then
+    shift 1
+
+    if [ "$EXEC" == "yes" ]; then
+        ARGS+=(exec -u "$WWWUSER")
+        [ ! -t 0 ] && ARGS+=(-T)
+        ARGS+=("$APP_SERVICE" "node" "$@") 
+    elif [ "$EXEC" == "no" ]; then
+        is_not_running
+    fi
+
+elif [ "$1" == "npm" ]; then
+    shift 1
+
+    if [ "$EXEC" == "yes" ]; then
+        ARGS+=(exec -u "$WWWUSER")
+        [ ! -t 0 ] && ARGS+=(-T)
+        ARGS+=("$APP_SERVICE" "npm" "$@") 
+    elif [ "$EXEC" == "no" ]; then
+        is_not_running
+    fi
+
+elif [ "$1" == "npx" ]; then
+    shift 1
+
+    if [ "$EXEC" == "yes" ]; then
+        ARGS+=(exec -u "$WWWUSER")
+        [ ! -t 0 ] && ARGS+=(-T)
+        ARGS+=("$APP_SERVICE" "npx" "$@") 
+    elif [ "$EXEC" == "no" ]; then
+        is_not_running
+    fi
+
+elif [ "$1" == "yarn" ]; then
+    shift 1
+
+    if [ "$EXEC" == "yes" ]; then
+        ARGS+=(exec -u "$WWWUSER")
+        [ ! -t 0 ] && ARGS+=(-T)
+        ARGS+=("$APP_SERVICE" "yarn" "$@") 
+    elif [ "$EXEC" == "no" ]; then
+        is_not_running
+    fi
+
+elif [ "$1" == "mysql" ]; then
+    shift 1
+
+    if [ "$EXEC" == "yes" ]; then
+        ARGS+=(exec -u "$WWWUSER")
+        [ ! -t 0 ] && ARGS+=(-T)
+        ARGS+=(mysql bash -c)
+        ARGS+=("MYSQL_PWD=\${MYSQL_PASSWORD} mysql -u \${MYSQL_USER} \${MYSQL_DATABASE}") 
+    elif [ "$EXEC" == "no" ]; then
+        is_not_running
+    fi
+
+elif [ "$1" == "mariadb" ]; then
+    shift 1
+
+    if [ "$EXEC" == "yes" ]; then
+        ARGS+=(exec -u "$WWWUSER")
+        [ ! -t 0 ] && ARGS+=(-T)
+        ARGS+=(mariadb bash -c)
+        ARGS+=("MYSQL_PWD=\${MYSQL_PASSWORD} mysql -u \${MYSQL_USER} \${MYSQL_DATABASE}") 
+    elif [ "$EXEC" == "no" ]; then
+        is_not_running
+    fi
+
+elif [ "$1" == "shell" ] || [ "$1" == "bash" ]; then
+    shift 1
+
+    if [ "$EXEC" == "yes" ]; then
+        ARGS+=(exec -u "$WWWUSER")
+        [ ! -t 0 ] && ARGS+=(-T)
+        ARGS+=("$APP_SERVICE" "bash" "$@")
+    elif [ "$EXEC" == "no" ]; then
+        is_not_running
+    fi
+
+elif [ "$1" == "root-shell" ] || [ "$1" == "root-bash" ]; then
+    shift 1
+
+    if [ "$EXEC" == "yes" ]; then
+        ARGS+=(exec)
+        [ ! -t 0 ] && ARGS+=(-T)
+        ARGS+=("$APP_SERVICE" "bash" "$@")
+    elif [ "$EXEC" == "no" ]; then
+        is_not_running
+    fi
+
+elif [ "$1" == "redis" ]; then
+    shift 1
+
+    if [ "$EXEC" == "yes" ]; then
+        ARGS+=(exec)
+        [ ! -t 0 ] && ARGS+=(-T)
+        ARGS+=(redis redis-cli)
+    elif [ "$EXEC" == "no" ]; then
+        is_not_running
+    fi
+
+else
+    ARGS+=("$@")
+fi
+
+# debug
+# echo "${DOCKER_COMPOSE[@]}" "${ARGS[@]}"
+"${DOCKER_COMPOSE[@]}" "${ARGS[@]}"
