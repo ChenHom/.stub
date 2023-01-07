@@ -27,9 +27,9 @@ function display_help {
     echo "  ${GREEN}hahawk restart${NC}                     重啟應用程式"
     echo "  ${GREEN}hahawk ps${NC}                          顯示所有容器狀態"
     echo
-    echo "${YELLOW}Create Laraval Application:${NC}"
-    echo "  ${GREEN}hahawk create app_name [-s service1,service2...]${NC}     建立 Laravel 的應用程式"
-    # echo "  ${GREEN}hahawk create nest app_name${NC}        建立 Nest 的應用程式"
+    echo "${YELLOW}Create Application Commands:${NC}"
+    echo "  ${GREEN}hahawk laravel app_name [-s service1,service2...]${NC}     建立 Laravel 的應用程式"
+    echo "  ${GREEN}hahawk nest app_name${NC}                                  建立 Nest 的應用程式"
     echo
     echo "${YELLOW}PHP Commands:${NC}"
     echo "  ${GREEN}hahawk php ...${NC}                     執行 PHP 的程式碼"
@@ -46,6 +46,9 @@ function display_help {
     echo "  ${GREEN}hahawk npm ...${NC}                     執行 NPM 指令"
     echo "  ${GREEN}hahawk npx${NC}                         執行 NPX 指令"
     echo "  ${GREEN}hahawk npm run prod${NC}"
+    echo
+    echo "${YELLOW}Nest Commands:${NC}"
+    echo "  ${GREEN}hahawk nest ...${NC}                           執行 Nest 指令" 
     echo
     echo "${YELLOW}Yarn Commands:${NC}"
     echo "  ${GREEN}hahawk yarn ...${NC}                    執行 Yarn 指令"
@@ -127,7 +130,7 @@ fi
 
 ARGS=()
 
-if [ "$1" == "create" ]; then
+if [ "$1" == "laravel" ]; then
     shift 1
 
     DIR_NAME=$1
@@ -154,6 +157,17 @@ if [ "$1" == "create" ]; then
     else
         echo "查無可複製的 ${YELLOW}Makefile${NC}"
     fi
+
+    exit 0
+
+elif [ "$1" == "nest" ]; then
+
+    docker run -it --rm \
+    --pull=always \
+    -v "$(pwd)":/app \
+    -w /app \
+    chom/images-nestjs:latest \
+    nest new ${2}
 
     exit 0
 
@@ -245,6 +259,17 @@ elif [ "$1" == "yarn" ]; then
         is_not_running
     fi
 
+elif [ "$1" == "nest" ]; then
+    shift 1
+
+    if [ "$EXEC" == "yes" ]; then
+        ARGS+=(exec -u "$WWWUSER")
+        [ ! -t 0 ] && ARGS+=(-T)
+        ARGS+=("$APP_SERVICE" "nest" "$@") 
+    elif [ "$EXEC" == "no" ]; then
+        is_not_running
+    fi
+
 elif [ "$1" == "mysql" ]; then
     shift 1
 
@@ -307,5 +332,4 @@ else
 fi
 
 # debug
-# echo "${DOCKER_COMPOSE[@]}" "${ARGS[@]}"
 "${DOCKER_COMPOSE[@]}" "${ARGS[@]}"
