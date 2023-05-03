@@ -30,6 +30,7 @@ function display_help {
     echo "${YELLOW}Create Application Commands:${NC}"
     echo "  ${GREEN}hahawk laravel app_name [-s service1,service2...]${NC}     建立 Laravel 的應用程式"
     echo "  ${GREEN}hahawk nest app_name${NC}                                  建立 Nest 的應用程式"
+    echo "  ${GREEN}hahawk create app_name ${NC}                               建立原生 PHP 的應用程式"
     echo
     echo "${YELLOW}Artisan Commands:${NC}"
     echo "  ${GREEN}hahawk artisan ...${NC}          Run an Artisan command"
@@ -60,7 +61,6 @@ function display_help {
     echo
     echo "${YELLOW}Database Commands:${NC}"
     echo "  ${GREEN}hahawk mysql${NC}                       在 mysql 容器中啟動 mysql 的 cli"
-    echo "  ${GREEN}hahawk mariadb${NC}                     在 mariadb 容器中啟動 mariadb 的 cli"
     echo "  ${GREEN}hahawk redis${NC}                       在 redis 容器中啟動 redis 的 cli"
     echo
     echo "${YELLOW}Running Tests:${NC}"
@@ -95,7 +95,6 @@ if [ $# -gt 0 ]; then
 else
     display_help
 fi
-
 
 if [ -f ./.env ]; then
     source ./.env;
@@ -180,6 +179,24 @@ elif [ "$1" == "nest" ]; then
 
     exit 0
 
+elif [ "$1" == "create" ] || [ "$1" == "c" ]; then
+    shift 1
+
+    if [ "$EXEC" == "yes" ]; then
+        cd "${HOME}/code/php/test"
+
+        docker run --rm \
+            --pull=always \
+            -v "$(pwd)":/opt \
+            -w /opt \
+            laravelsail/php82-composer:latest \
+            bash -c "mkdir ${1} && cd ${1} && composer init -q --description description --author hom"
+
+        echo "已建立目錄，請執行${GREEN}${BOLD} cd ${HOME}/code/php/test/${1} ${NC}"
+        exit 0
+    else
+        is_not_running
+    fi
 elif [ "$1" == "artisan" ] || [ "$1" == "art" ]; then
     shift 1
 
@@ -303,18 +320,6 @@ elif [ "$1" == "mysql" ]; then
         [ ! -t 0 ] && ARGS+=(-T)
         ARGS+=(mysql bash -c)
         ARGS+=("MYSQL_PWD=\${MYSQL_PASSWORD} mysql -u \${MYSQL_USER} \${MYSQL_DATABASE}") 
-    elif [ "$EXEC" == "no" ]; then
-        is_not_running
-    fi
-
-elif [ "$1" == "mariadb" ]; then
-    shift 1
-
-    if [ "$EXEC" == "yes" ]; then
-        ARGS+=(exec -u "$WWWUSER")
-        [ ! -t 0 ] && ARGS+=(-T)
-        ARGS+=(mariadb bash -c)
-        ARGS+=("MYSQL_PWD=\${MYSQL_PASSWORD} mysql -u \${MYSQL_USER} \${MYSQL_DATABASE}")
     elif [ "$EXEC" == "no" ]; then
         is_not_running
     fi
