@@ -71,6 +71,7 @@ function display_help {
     echo "  ${GREEN}hahawk bash${NC}                        'hahawk shell'的別名"
     echo "  ${GREEN}hahawk root-shell${NC}                  在應用程式容器中啟動 root 的 cli"
     echo "  ${GREEN}hahawk root-bash${NC}                   'hahawk root-shell'的別名"
+    echo "  ${GREEN}hahawk nginx${NC}                       在 nginx 容器中啟動 cli"
     echo
     echo "${YELLOW}Binaries:${NC}"
     echo "  ${GREEN}hahawk bin ...${NC}                     執行在 vendor/bin 中的 Composer 腳本"
@@ -229,7 +230,12 @@ elif [ "$1" == "composer" ]; then
     if [ "$EXEC" == "yes" ]; then
         ARGS+=(exec -u "$WWWUSER")
         [ ! -t 0 ] && ARGS+=(-T)
-        ARGS+=("$APP_SERVICE" "composer" "$@") 
+        if [ -f ./composer.phar ]; then
+            ARGS+=("$APP_SERVICE" "bash" "-c" "./composer.phar $@")
+        else
+            ARGS+=("$APP_SERVICE" "composer" "$@")
+        fi
+
     elif [ "$EXEC" == "no" ]; then
         is_not_running
     fi
@@ -308,7 +314,18 @@ elif [ "$1" == "mariadb" ]; then
         ARGS+=(exec -u "$WWWUSER")
         [ ! -t 0 ] && ARGS+=(-T)
         ARGS+=(mariadb bash -c)
-        ARGS+=("MYSQL_PWD=\${MYSQL_PASSWORD} mysql -u \${MYSQL_USER} \${MYSQL_DATABASE}") 
+        ARGS+=("MYSQL_PWD=\${MYSQL_PASSWORD} mysql -u \${MYSQL_USER} \${MYSQL_DATABASE}")
+    elif [ "$EXEC" == "no" ]; then
+        is_not_running
+    fi
+
+elif [ "$1" == "nginx" ]; then
+    shift 1
+
+    if [ "$EXEC" == "yes" ]; then
+        ARGS+=(exec -u "$WWWUSER")
+        [ ! -t 0 ] && ARGS+=(-T)
+        ARGS+=("nginx" "bash" "$@")
     elif [ "$EXEC" == "no" ]; then
         is_not_running
     fi
